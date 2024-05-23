@@ -24,10 +24,10 @@ def read_data():
     return capacidad_por_saco, costo_saco, tiempo_demora, kilos_fruta, precio_venta, capital_inicial, cantidad_cuadrantes
 
 def solve_model():
-    α, c, θ, λ, β, γ, K = read_data()
+    cap_saco, costo, tiempo, kilos, precio, capital, K = read_data()
 
-    J = len(α)  # Número de tipos de semillas
-    T = c.shape[1]  # Número de meses
+    J = len(cap_saco)  # Número de tipos de semillas
+    T = costo.shape[1]  # Número de meses
     K = int(K)  # Número de cuadrantes
 
     # Crear modelo
@@ -48,7 +48,7 @@ def solve_model():
         for k in range(K):
             for t in range(T):
                 # Activación sembrado
-                model.addConstr(gp.quicksum(Y[j, k, l] for l in range(t, min(t+θ[j], T))) >= θ[j] * X[j, k, t])
+                model.addConstr(gp.quicksum(Y[j, k, l] for l in range(t, min(t+tiempo[j], T))) >= tiempo[j] * X[j, k, t])
 
     for k in range(K):
         for t in range(T):
@@ -57,25 +57,25 @@ def solve_model():
 
     for t in range(1, T):
         # Inventario de dinero
-        model.addConstr(I[t] == I[t-1] - gp.quicksum(c[j, t] * W[j, t] for j in range(J)) +
-                        gp.quicksum(X[j, k, t-θ[j]] * λ[j] * β[j, t] for j in range(J) for k in range(K) if t-θ[j] >= 0))
+        model.addConstr(I[t] == I[t-1] - gp.quicksum(costo[j, t] * W[j, t] for j in range(J)) +
+                        gp.quicksum(X[j, k, t-tiempo[j]] * kilos[j] * precio[j, t] for j in range(J) for k in range(K) if t >= tiempo[j]))
     
     # Condición borde inventario dinero
-    model.addConstr(I[0] == γ - gp.quicksum(c[j, 0] * W[j, 0] for j in range(J)))
+    model.addConstr(I[0] == capital - gp.quicksum(costo[j, 0] * W[j, 0] for j in range(J)))
 
     for j in range(J):
         for t in range(1, T):
             # Inventario de semillas
-            model.addConstr(U[j, t] == U[j, t-1] + α[j] * W[j, t] - gp.quicksum(X[j, k, t] for k in range(K)))
+            model.addConstr(U[j, t] == U[j, t-1] + cap_saco[j] * W[j, t] - gp.quicksum(X[j, k, t] for k in range(K)))
         
         # Condición borde semillas
-        model.addConstr(U[j, 0] == α[j] * W[j, 0] - gp.quicksum(X[j, k, 0] for k in range(K)))
+        model.addConstr(U[j, 0] == cap_saco[j] * W[j, 0] - gp.quicksum(X[j, k, 0] for k in range(K)))
 
     for j in range(J):
         for k in range(K):
             for t in range(T-1):
                 # Terminar cosecha antes de volver a cosechar
-                model.addConstr(1 - X[j, k, t] >= gp.quicksum(X[j, k, l] for l in range(t+1, min(t+θ[j], T))))
+                model.addConstr(1 - X[j, k, t] >= gp.quicksum(X[j, k, l] for l in range(t+1, min(t+tiempo[j], T))))
 
     # Restricciones adicionales
     for t in range(T):
@@ -105,7 +105,7 @@ def solve_model():
             for t in range(T):
                 for j in range(J):
                     if X[j, k, t].X > 0:
-                        calendario[k][t] = j+1
+                        calendario[k][t] = j
         
         df_calendario = pd.DataFrame(calendario, columns=[f"Mes {t+1}" for t in range(T)], index=[f"Terreno {k+1}" for k in range(K)])
         print("\nCalendario de plantaciones:")
